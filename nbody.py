@@ -1,5 +1,5 @@
 import numpy as np
-
+import sys
 
 def read_parameters(filename):
     """
@@ -71,8 +71,8 @@ def write_state(timestep, x):
         f.writelines("\n".join(lines))
 
 
-def print_state(l, x, v, mass, dt):
-    U = compute_potential_energy(x, v, mass)
+def print_state(l, x, v, mass, dt, epsilon):
+    U = compute_potential_energy(x, v, mass, epsilon)
     K = compute_kinetic_energy(x, v, mass)
     total_energy = K - U
     print(l * dt, total_energy / x.shape[0])
@@ -89,11 +89,11 @@ def center_particles(arr, mass):
     arr -= center_mass
 
 
-def compute_potential_energy(x, v, mass):
+def compute_potential_energy(x, v, mass, epsilon):
     U = 0.0
     for i in range(x.shape[0]):
         for j in range(x.shape[0]):
-            rij = np.sqrt(((x[i] - x[j]) ** 2).sum() + parameters["epsilon"])
+            rij = np.sqrt(((x[i] - x[j]) ** 2).sum() + epsilon)
             U += mass[i] * mass[j] / rij
     return U
 
@@ -112,7 +112,7 @@ def set_initial_value(parameters):
     dX = gen.random((Np, 3))
     scale(dX, -0.2, 0.2)
     mass = gen.random(Np)
-    scale(Mass, parameters["min_mass"], parameters["max_mass"])
+    scale(mass, parameters["min_mass"], parameters["max_mass"])
 
     # Add rotation
     dX[:, 1] += X[:, 0] / 10.0
@@ -126,7 +126,7 @@ def set_initial_value(parameters):
     if parameters["bound_state"]:
         # Make sure that the total energy of the system is negative
         # so particle don't fly in the distance
-        U = compute_potential_energy(X, dX, mass)
+        U = compute_potential_energy(X, dX, mass, parameters["epsilon"])
         K = compute_kinetic_energy(X, dX, mass)
         alpha = np.sqrt(U / (2.0 * K))
         dX *= alpha
@@ -158,7 +158,7 @@ def step_verlet(x, v, acc, mass, dt, epsilon):
     acc[:] = accnew[:]
 
 
-def integrate(x, v, mass, parameter):
+def integrate(x, v, mass, parameters):
     dt = parameters["timestep"]
     Np = parameters["nparticle"]
     Nt = int(parameters["max_time"] // dt)
@@ -168,7 +168,7 @@ def integrate(x, v, mass, parameter):
     acc = compute_acceleration(x, mass, epsilon)
     for l in range(Nt):
         if l % write_frequency == 0:
-            print_state(l, x, v, mass, dt)
+            print_state(l, x, v, mass, dt, epsilon)
         step_verlet(x, v, acc, mass, dt, epsilon)
     write_state(Nt, x)
 
@@ -178,7 +178,7 @@ def main():
     Programme principal
     """
 
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 2:
         sys.exit(f"Utilisation: {sys.argv[0]}  parameters.txt")
 
     filename = sys.argv[1]
